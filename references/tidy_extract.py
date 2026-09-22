@@ -19,6 +19,16 @@ from collections import defaultdict, Counter
 
 import pdfplumber
 
+# 繁→简：老板要求本 skill 所有产出默认简体（年报港股/A+H 章节常为繁体）。
+# opencc t2s 幂等——对纯简体文本无副作用；缺依赖时安全降级不阻断。
+try:
+    import opencc
+    _CC = opencc.OpenCC("t2s")
+    FORCE_SIMPLIFIED = True
+except Exception:
+    _CC = None
+    FORCE_SIMPLIFIED = False
+
 CJK_RE = re.compile(r'[\u4e00-\u9fff]')
 # 标题行：第X节 / 一、 / （一） / (一) / 1. / 1、 / （1） / (1)
 HEAD_RE = re.compile(
@@ -416,6 +426,8 @@ def extract_range(pdf_path, start, end, drop_en=True):
                 items.append(('t', tm, (pno, -1)))
     text = _render(_merge_across_pages(items))
     text = re.sub(r'\n{3,}', '\n\n', text).strip()
+    if FORCE_SIMPLIFIED and _CC is not None:
+        text = _CC.convert(text)
     return text
 
 

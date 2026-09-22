@@ -25,6 +25,16 @@ except ImportError:
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import tidy_extract
 
+# 繁→简：老板要求所有产出默认简体（港股年报章节常是繁体，如「主席報告」「發電量」）。
+# opencc t2s 幂等，对简体文本无副作用；缺依赖时安全降级不阻断。
+try:
+    import opencc
+    _CC = opencc.OpenCC("t2s")
+    FORCE_SIMPLIFIED = True
+except Exception:
+    _CC = None
+    FORCE_SIMPLIFIED = False
+
 BASE = "/Volumes/KIOXIA/上市公司研究/电力系统/01-发电运营（15家）"
 # 生成的年份 MD 统一归置到公司目录下的专属子文件夹（不在根目录与 CSV/年报PDF 混放）
 SUBDIR = "董事长致辞与MD&A"
@@ -394,8 +404,11 @@ def process_company(comp_dir, dry=False):
         else:
             L.append("【未找到该章节】")
         L.append("")
+        content = "\n".join(L)
+        if FORCE_SIMPLIFIED and _CC is not None:
+            content = _CC.convert(content)
         with open(out_path, "w", encoding="utf-8") as fh:
-            fh.write("\n".join(L))
+            fh.write(content)
         n_written += 1
     return comp, len(results), sum(1 for r in results if r[2][0]), sum(1 for r in results if r[3][0]), n_written
 
